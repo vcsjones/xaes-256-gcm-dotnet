@@ -1,0 +1,27 @@
+name: Pull Request
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: ['windows-latest', 'ubuntu-latest']
+        framework: ['net8.0', 'net10.0', 'net472']
+        exclude:
+          - os: ubuntu-latest
+            framework: net472
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v5
+      name: Checkout
+    - uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: |
+          '8.0'
+          '10.0'
+    - run: dotnet test --framework ${{ matrix.framework }}

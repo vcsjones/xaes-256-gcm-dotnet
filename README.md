@@ -20,10 +20,10 @@ using Xaes256Gcm xaes = new(key);
 
 // Seal, or encrypt
 // AAD can optionally be passed as a 3rd argument
-byte[] ciphertext = xaes.Seal(plaintext, nonce);
+byte[] ciphertext = xaes.Encrypt(plaintext, nonce);
 
 // Open, or decrypt
-byte[] decrypted = xaes.Open(ciphertext, nonce);
+byte[] decrypted = xaes.Decrypt(ciphertext, nonce);
 ```
 
 Additional overloads that accept Span-based inputs and outputs are also available.
@@ -31,9 +31,3 @@ Additional overloads that accept Span-based inputs and outputs are also availabl
 # Tests
 
 Tests use inputs and outputs from the reference implementation and can be run with `dotnet test`.
-The accumulation tests require SHAKE-128 squeezing, which currently requires a preview of .NET 9.
-If you have .NET 9 Preview 7 or later, the accumulation tests can be run with with
-`dotnet test /p:RunAccumulationTests=true`.
-
-If the switch is used without the requisite version of .NET, the tests will fail to compile.
-When .NET 9 stabilizes the switch will not be required.
