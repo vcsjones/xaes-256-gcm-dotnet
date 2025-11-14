@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Xaes256Gcm/Xaes256Gcm.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Xaes256Gcm.Tests/Xaes256Gcm.Tests.csproj" />
+  </Folder>
+</Solution>
