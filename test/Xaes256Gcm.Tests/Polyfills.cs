@@ -2,6 +2,7 @@ namespace Xaes256Gcm.Tests;
 
 internal static class Polyfills {
     extension(Convert) {
+#if !NET
         public static byte[] FromHexString(ReadOnlySpan<char> chars) {
             if (chars.IsEmpty) {
                 return [];
@@ -18,8 +19,8 @@ internal static class Polyfills {
             for (int i = 0, j = 0; i < buffer.Length; i++, j += 2) {
                 char c1 = chars[j];
                 char c2 = chars[j + 1];
-                int value = HexCharToInt(c1);
-                value |= HexCharToInt(c2) << 4;
+                int value = HexCharToInt(c2);
+                value |= HexCharToInt(c1) << 4;
                 buffer[i] = (byte)value;
             }
 
@@ -34,5 +35,6 @@ internal static class Polyfills {
                 };
             }
         }
+#endif
     }
 }
