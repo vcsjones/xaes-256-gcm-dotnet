@@ -1,7 +1,7 @@
 XAES-256-GCM for .NET
 ========
 
-This is an implementation of XAES-256-GCM as proposed by Filippo Valsorda, for .NET 8+.
+This is an implementation of XAES-256-GCM as proposed by Filippo Valsorda, for .NET 8+ and .NET Framework.
 
 Resources:
 * Original post by Filippo: https://words.filippo.io/dispatches/xaes-256-gcm/
@@ -13,17 +13,16 @@ Resources:
 
 ```C#
 byte[] key; // Assign to some key
-byte[] nonce = RandomNumberGenerator.GetBytes(Xaes256Gcm.NonceSize);
 byte[] plaintext = "Hello XAES-256-GCM from .NET"u8.ToArray();
 
 using Xaes256Gcm xaes = new(key);
 
 // Seal, or encrypt
 // AAD can optionally be passed as a 3rd argument
-byte[] ciphertext = xaes.Encrypt(plaintext, nonce);
+byte[] ciphertext = xaes.Seal(plaintext);
 
 // Open, or decrypt
-byte[] decrypted = xaes.Decrypt(ciphertext, nonce);
+byte[] decrypted = xaes.Open(ciphertext);
 ```
 
 Additional overloads that accept Span-based inputs and outputs are also available.
