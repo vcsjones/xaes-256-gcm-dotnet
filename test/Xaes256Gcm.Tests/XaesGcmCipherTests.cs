@@ -76,12 +76,12 @@ public static class Xaes256GcmTests {
     [Fact]
     public static void Decrypt_ArgValidation_InvalidNonceSize() {
         Xaes256GcmCipher xaes = new(ZeroKey);
-        Assert.Throws<ArgumentException>("nonce", () => xaes.Encrypt(ZeroCiphertext, ZeroNonce.AsSpan()[..^1].ToArray()));
-        Assert.Throws<ArgumentException>("nonce", () => xaes.Encrypt(ZeroCiphertext, [..ZeroNonce, 0]));
+        Assert.Throws<ArgumentException>("nonce", () => xaes.Decrypt(ZeroCiphertext, ZeroNonce.AsSpan()[..^1].ToArray()));
+        Assert.Throws<ArgumentException>("nonce", () => xaes.Decrypt(ZeroCiphertext, [..ZeroNonce, 0]));
 
         byte[] buffer = [];
-        Assert.Throws<ArgumentException>("nonce", () => xaes.Encrypt(ZeroCiphertext, ZeroNonce.AsSpan()[..^1], buffer.AsSpan()));
-        Assert.Throws<ArgumentException>("nonce", () => xaes.Encrypt(ZeroCiphertext, [..ZeroNonce, 0], buffer.AsSpan()));
+        Assert.Throws<ArgumentException>("nonce", () => xaes.Decrypt(ZeroCiphertext, ZeroNonce.AsSpan()[..^1], buffer.AsSpan()));
+        Assert.Throws<ArgumentException>("nonce", () => xaes.Decrypt(ZeroCiphertext, [..ZeroNonce, 0], buffer.AsSpan()));
     }
 
     [Fact]
