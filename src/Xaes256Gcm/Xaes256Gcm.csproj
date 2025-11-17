@@ -6,10 +6,15 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
+    <Authors>Kevin Jones</Authors>
+    <Deterministic>true</Deterministic>
   </PropertyGroup>
 
   <PropertyGroup Condition="$(TargetFramework.StartsWith('net4'))">
     <Nullable>annotations</Nullable>
+    <IsAotCompatible>false</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup Condition="$(TargetFramework.StartsWith('net4'))">

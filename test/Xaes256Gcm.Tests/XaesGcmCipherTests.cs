@@ -5,17 +5,24 @@ using System.Security.Cryptography;
 namespace Xaes256Gcm.Tests;
 
 public static class Xaes256GcmTests {
+    public static byte[] ZeroKey => field ??= new byte[Xaes256GcmCipher.KeySize];
+    public static byte[] ZeroNonce => field ??= new byte[Xaes256GcmCipher.NonceSize];
+    public static byte[] ZeroCiphertext => field ??= [0xFE, 0x62, 0x02, 0x4A, 0x33, 0x49, 0xC0, 0x6A, 0x33, 0xAF, 0xDA, 0x22, 0xA1, 0x33, 0x98, 0x1B];
+    public static byte[] OneCiphertext => field ??= [0x2D, 0x01, 0x37, 0xD1, 0x9A, 0xB3, 0xEE, 0x4C, 0x46, 0xCA, 0x4D, 0xEC, 0x7D, 0x31, 0x39, 0x50, 0xC2];
+
     [Theory]
     [MemberData(nameof(TestVectors))]
     public static void TestVectors_Span((byte[] Key, byte[] Nonce, byte[] Plaintext, byte[] Ciphertext, byte[] Aad) testVector) {
         Xaes256GcmCipher xaes = new(testVector.Key.AsSpan());
-        Span<byte> ciphertext = new byte[testVector.Plaintext.Length + Xaes256GcmCipher.OverheadEncryption];
-        xaes.Encrypt(testVector.Plaintext.AsSpan(), testVector.Nonce.AsSpan(), ciphertext, testVector.Aad.AsSpan());
-        Assert.Equal(testVector.Ciphertext, ciphertext);
+        Span<byte> ciphertext = new byte[testVector.Plaintext.Length + Xaes256GcmCipher.OverheadEncryption + 256];
+        int written = xaes.Encrypt(testVector.Plaintext.AsSpan(), testVector.Nonce.AsSpan(), ciphertext, testVector.Aad.AsSpan());
+        Assert.Equal(testVector.Ciphertext, ciphertext[..written]);
+        Assert.Equal(testVector.Ciphertext.Length, written);
 
-        Span<byte> decrypted = new byte[testVector.Plaintext.Length];
-        xaes.Decrypt(ciphertext, testVector.Nonce.AsSpan(), decrypted, testVector.Aad.AsSpan());
-        Assert.Equal(testVector.Plaintext, decrypted);
+        Span<byte> decrypted = new byte[testVector.Plaintext.Length + 256];
+        written = xaes.Decrypt(ciphertext[..written], testVector.Nonce.AsSpan(), decrypted, testVector.Aad.AsSpan());
+        Assert.Equal(testVector.Plaintext, decrypted[..written]);
+        Assert.Equal(testVector.Plaintext.Length, written);
     }
 
     [Theory]
@@ -27,6 +34,73 @@ public static class Xaes256GcmTests {
 
         byte[] decrypted = xaes.Decrypt(ciphertext, testVector.Nonce, testVector.Aad);
         Assert.Equal(testVector.Plaintext, decrypted);
+    }
+
+    [Fact]
+    public static void Ctor_ArgValidation_Null() {
+        Assert.Throws<ArgumentNullException>("key", static () => new Xaes256GcmCipher(null));
+    }
+
+    [Fact]
+    public static void Encrypt_ArgValidation_Null() {
+        Xaes256GcmCipher xaes = new(ZeroKey);
+        Assert.Throws<ArgumentNullException>("plaintext", () => xaes.Encrypt(null, ZeroNonce));
+        Assert.Throws<ArgumentNullException>("nonce", () => xaes.Encrypt([], null));
+    }
+
+    [Fact]
+    public static void Encrypt_ArgValidation_InvalidNonceSize() {
+        Xaes256GcmCipher xaes = new(ZeroKey);
+        Assert.Throws<ArgumentException>("nonce", () => xaes.Encrypt([], ZeroNonce.AsSpan()[..^1].ToArray()));
+        Assert.Throws<ArgumentException>("nonce", () => xaes.Encrypt([], [..ZeroNonce, 0]));
+
+        byte[] buffer = new byte[Xaes256GcmCipher.OverheadEncryption];
+        Assert.Throws<ArgumentException>("nonce", () => xaes.Encrypt([], ZeroNonce.AsSpan()[..^1], buffer.AsSpan()));
+        Assert.Throws<ArgumentException>("nonce", () => xaes.Encrypt([], [..ZeroNonce, 0], buffer.AsSpan()));
+    }
+
+    [Fact]
+    public static void Encrypt_ArgValidation_DestinationTooSmall() {
+        Xaes256GcmCipher xaes = new(ZeroKey);
+        byte[] buffer = new byte[Xaes256GcmCipher.OverheadEncryption - 1];
+        Assert.Throws<ArgumentException>("destination", () => xaes.Encrypt([], ZeroNonce, buffer.AsSpan()));
+    }
+
+    [Fact]
+    public static void Decrypt_ArgValidation_Null() {
+        Xaes256GcmCipher xaes = new(ZeroKey);
+        Assert.Throws<ArgumentNullException>("ciphertext", () => xaes.Decrypt(null, ZeroNonce));
+        Assert.Throws<ArgumentNullException>("nonce", () => xaes.Decrypt([], null));
+    }
+
+    [Fact]
+    public static void Decrypt_ArgValidation_InvalidNonceSize() {
+        Xaes256GcmCipher xaes = new(ZeroKey);
+        Assert.Throws<ArgumentException>("nonce", () => xaes.Encrypt(ZeroCiphertext, ZeroNonce.AsSpan()[..^1].ToArray()));
+        Assert.Throws<ArgumentException>("nonce", () => xaes.Encrypt(ZeroCiphertext, [..ZeroNonce, 0]));
+
+        byte[] buffer = [];
+        Assert.Throws<ArgumentException>("nonce", () => xaes.Encrypt(ZeroCiphertext, ZeroNonce.AsSpan()[..^1], buffer.AsSpan()));
+        Assert.Throws<ArgumentException>("nonce", () => xaes.Encrypt(ZeroCiphertext, [..ZeroNonce, 0], buffer.AsSpan()));
+    }
+
+    [Fact]
+    public static void Decrypt_ArgValidation_DestinationTooSmall() {
+        Xaes256GcmCipher xaes = new(ZeroKey);
+        byte[] buffer = new byte[OneCiphertext.Length - Xaes256GcmCipher.OverheadEncryption - 1];
+        Assert.Throws<ArgumentException>("destination", () => xaes.Decrypt(OneCiphertext, ZeroNonce, buffer.AsSpan()));
+    }
+
+    [Fact]
+    public static void UseAfterDispose() {
+        Xaes256GcmCipher xaes = new(ZeroKey);
+        xaes.Dispose();
+        xaes.Dispose(); // No-op for secondary dispose.
+        byte[] destination = new byte[Xaes256GcmCipher.OverheadEncryption];
+        Assert.Throws<ObjectDisposedException>(() => xaes.Encrypt([], ZeroNonce));
+        Assert.Throws<ObjectDisposedException>(() => xaes.Encrypt([], ZeroNonce, destination.AsSpan()));
+        Assert.Throws<ObjectDisposedException>(() => xaes.Decrypt(ZeroCiphertext, ZeroNonce));
+        Assert.Throws<ObjectDisposedException>(() => xaes.Decrypt(ZeroCiphertext, ZeroNonce, destination.AsSpan()));
     }
 
 #if NET9_0_OR_GREATER

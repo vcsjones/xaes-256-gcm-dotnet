@@ -3,11 +3,36 @@ using System.Security.Cryptography;
 
 namespace Xaes256Gcm;
 
+/// <summary>
+///   Implements the XAES-256-GCM algorithm.
+/// </summary>
+/// <remarks>
+///   <para>The XAES-256-GCM algorithm is specified by https://github.com/C2SP/C2SP/blob/main/XAES-256-GCM.md.</para>
+///   <para>
+///     Instances of this object are not thread safe. Callers must instances are only ever accessed exclusively by
+///     a single thread. Using instances of this type from multiple threads may result in data corruption.
+///   </para>
+/// </remarks>
 public sealed class Xaes256GcmCipher : IDisposable {
 
+    /// <summary>
+    ///   The overhead of encrypting a plaintext, in bytes.
+    /// </summary>
     public const int OverheadEncryption = TagSize;
+
+    /// <summary>
+    ///   The size of the nonce, in bytes.
+    /// </summary>
     public const int NonceSize = 24;
+
+    /// <summary>
+    ///   The overhead of sealing a plaintext, in bytes.
+    /// </summary>
     public const int Overhead = OverheadEncryption + NonceSize;
+
+    /// <summary>
+    ///   The size of the key, in bytes.
+    /// </summary>
     public const int KeySize = 32;
 
     private const int BlockSize = 16;
@@ -18,6 +43,16 @@ public sealed class Xaes256GcmCipher : IDisposable {
     private ICryptoTransform? _transform;
     private readonly byte[] _k1;
 
+    /// <summary>
+    ///   Creates a new instance of <see cref="Xaes256GcmCipher"/>.
+    /// </summary>
+    /// <param name="key">The key.</param>
+    /// <exception cref="ArgumentException">
+    ///   <paramref name="key"/> is not exactly <see cref="KeySize"/> bytes.
+    /// </exception>
+    /// <exception cref="PlatformNotSupportedException">
+    ///   The current platform does not support AES.
+    /// </exception>
     public Xaes256GcmCipher(ReadOnlySpan<byte> key) {
         if (key.Length != KeySize) {
             throw new ArgumentException(ExceptionText.InvalidKeyLength, nameof(key));
@@ -35,6 +70,10 @@ public sealed class Xaes256GcmCipher : IDisposable {
         _k1 = InitializeK1(_transform);
     }
 
+    /// <inheritdoc cref="Xaes256GcmCipher(ReadOnlySpan{byte})"/>
+    /// <exception cref="ArgumentNullException">
+    ///   <paramref name="key"/> is <see langword="null"/>.
+    /// </exception>
     public Xaes256GcmCipher(byte[] key) {
         ArgumentNullException.ThrowIfNull(key);
 
@@ -72,6 +111,27 @@ public sealed class Xaes256GcmCipher : IDisposable {
         return k1;
     }
 
+    /// <summary>
+    ///   Encrypts a plaintext using the current key and specified nonce, with optional additional data.
+    /// </summary>
+    /// <param name="plaintext">The plaintext to encrypt.</param>
+    /// <param name="nonce">The nonce to use.</param>
+    /// <param name="additionalData">Additional data to authenticate as part of the encryption.</param>
+    /// <returns>A byte array containing the ciphertext.</returns>
+    /// <remarks>
+    ///   The ciphertext's length will be the length of <paramref name="plaintext"/> plus <see cref="OverheadEncryption"/>.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">
+    ///   <paramref name="plaintext"/> or <paramref name="nonce"/> is <see langword="null" />.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    ///   <para><paramref name="plaintext"/> is too long to encrypt.</para>
+    ///   <para> -or- </para>
+    ///   <para><paramref name="nonce"/> is not exactly <see cref="NonceSize"/> bytes.</para>
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    ///   The current instance has been disposed.
+    /// </exception>
     public byte[] Encrypt(byte[] plaintext, byte[] nonce, byte[]? additionalData = default) {
         ArgumentNullException.ThrowIfNull(plaintext);
         ArgumentNullException.ThrowIfNull(nonce);
@@ -84,6 +144,24 @@ public sealed class Xaes256GcmCipher : IDisposable {
         return destination;
     }
 
+    /// <summary>
+    ///   Encrypts a plaintext using the current key and specified nonce, with optional additional data.
+    /// </summary>
+    /// <param name="plaintext">The plaintext to encrypt.</param>
+    /// <param name="nonce">The nonce to use.</param>
+    /// <param name="destination">The buffer to receive the ciphertext.</param>
+    /// <param name="additionalData">Additional data to authenticate as part of the encryption.</param>
+    /// <returns>The number of bytes written to <paramref name="destination"/>.</returns>
+    /// <exception cref="ArgumentException">
+    ///   <para><paramref name="plaintext"/> is too long to encrypt.</para>
+    ///   <para> -or- </para>
+    ///   <para><paramref name="nonce"/> is not exactly <see cref="NonceSize"/> bytes.</para>
+    ///   <para> -or- </para>
+    ///   <para><paramref name="destination"/> is too small to receive the ciphertext.</para>
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    ///   The current instance has been disposed.
+    /// </exception>
     public int Encrypt(ReadOnlySpan<byte> plaintext, ReadOnlySpan<byte> nonce, Span<byte> destination, ReadOnlySpan<byte> additionalData = default) {
         ThrowIfPlaintextTooLarge(plaintext);
         ThrowIfNonceSizeIncorrect(nonce);
@@ -95,6 +173,27 @@ public sealed class Xaes256GcmCipher : IDisposable {
         return ciphertextLength;
     }
 
+    /// <summary>
+    ///   Decrypts a ciphertext using the current key and specified nonce, with optional additional data.
+    /// </summary>
+    /// <param name="ciphertext">The ciphertext to decrypt.</param>
+    /// <param name="nonce">The nonce to use.</param>
+    /// <param name="additionalData">The additional data to authenticate that was used as part of encryption.</param>
+    /// <returns>A byte array containing the plaintext.</returns>
+    /// <exception cref="ArgumentNullException">
+    ///   <paramref name="ciphertext"/> or <paramref name="nonce"/> is <see langword="null" />.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    ///   <para><paramref name="ciphertext"/> is too small to contain authenticated data.</para>
+    ///   <para> -or- </para>
+    ///   <para><paramref name="nonce"/> is not exactly <see cref="NonceSize"/> bytes.</para>
+    /// </exception>
+    /// <exception cref="AuthenticationTagMismatchException">
+    ///   The authentication tag does validate the ciphertext and additional data.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    ///   The current instance has been disposed.
+    /// </exception>
     public byte[] Decrypt(byte[] ciphertext, byte[] nonce, byte[]? additionalData = null) {
         ArgumentNullException.ThrowIfNull(ciphertext);
         ArgumentNullException.ThrowIfNull(nonce);
@@ -107,6 +206,27 @@ public sealed class Xaes256GcmCipher : IDisposable {
         return destination;
     }
 
+    /// <summary>
+    ///   Decrypts a ciphertext using the current key and specified nonce, with optional additional data.
+    /// </summary>
+    /// <param name="ciphertext">The ciphertext to decrypt.</param>
+    /// <param name="nonce">The nonce to use.</param>
+    /// <param name="destination">The buffer to receive the plaintext.</param>
+    /// <param name="additionalData">The additional data to authenticate that was used as part of encryption.</param>
+    /// <returns>The number of bytes written to <paramref name="destination"/>.</returns>
+    /// <exception cref="ArgumentException">
+    ///   <para><paramref name="ciphertext"/> is too small to contain authenticated data.</para>
+    ///   <para> -or- </para>
+    ///   <para><paramref name="nonce"/> is not exactly <see cref="NonceSize"/> bytes.</para>
+    ///   <para> -or- </para>
+    ///   <para><paramref name="destination"/> is too small to receive the ciphertext.</para>
+    /// </exception>
+    /// <exception cref="AuthenticationTagMismatchException">
+    ///   The authentication tag does validate the ciphertext and additional data.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    ///   The current instance has been disposed.
+    /// </exception>
     public int Decrypt(ReadOnlySpan<byte> ciphertext, ReadOnlySpan<byte> nonce, Span<byte> destination, ReadOnlySpan<byte> additionalData = default) {
         ThrowIfCiphertextTooSmall(ciphertext);
         ThrowIfNonceSizeIncorrect(nonce);
@@ -183,8 +303,15 @@ public sealed class Xaes256GcmCipher : IDisposable {
         }
     }
 
+    /// <summary>
+    ///   Disposes of the current instance and releases all resources.
+    /// </summary>
+    /// <remarks>
+    ///   The instance must not be used after it has been disposed.
+    /// </remarks>
     public void Dispose() {
         _transform?.Dispose();
         _transform = null;
+        Array.Clear(_k1, 0, _k1.Length);
     }
 }

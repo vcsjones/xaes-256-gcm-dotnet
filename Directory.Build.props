@@ -1,7 +1,5 @@
 <Project>
   <PropertyGroup>
-    <Authors>Kevin Jones</Authors>
-    <Deterministic>true</Deterministic>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
