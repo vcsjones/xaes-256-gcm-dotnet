@@ -9,7 +9,7 @@ namespace Xaes256Gcm;
 /// <remarks>
 ///   <para>The XAES-256-GCM algorithm is specified by https://github.com/C2SP/C2SP/blob/main/XAES-256-GCM.md.</para>
 ///   <para>
-///     Instances of this object are not thread safe. Callers must instances are only ever accessed exclusively by
+///     Instances of this object are not thread safe. Callers must ensure instances are only ever accessed exclusively by
 ///     a single thread. Using instances of this type from multiple threads may result in data corruption.
 ///   </para>
 /// </remarks>
@@ -219,7 +219,7 @@ public sealed class Xaes256GcmCipher : IDisposable {
     ///   <para> -or- </para>
     ///   <para><paramref name="nonce"/> is not exactly <see cref="NonceSize"/> bytes.</para>
     ///   <para> -or- </para>
-    ///   <para><paramref name="destination"/> is too small to receive the ciphertext.</para>
+    ///   <para><paramref name="destination"/> is too small to receive the plaintext.</para>
     /// </exception>
     /// <exception cref="AuthenticationTagMismatchException">
     ///   The authentication tag does validate the ciphertext and additional data.
