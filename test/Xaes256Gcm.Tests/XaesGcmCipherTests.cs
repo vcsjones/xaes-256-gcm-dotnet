@@ -66,7 +66,7 @@ public static class Xaes256GcmTests {
     public static void TestVectors_Decrypt_Span_Tampered(TestVector testVector) {
         Xaes256GcmCipher xaes = new(testVector.Key.AsSpan());
 
-        byte[] tamperedCiphertext =testVector.Ciphertext.AsSpan().ToArray();
+        byte[] tamperedCiphertext = testVector.Ciphertext.AsSpan().ToArray();
         FlipRandomBit(tamperedCiphertext);
         byte[] buffer = new byte[testVector.Plaintext.Length];
         Assert.Throws<AuthenticationTagMismatchException>(() =>
@@ -78,7 +78,7 @@ public static class Xaes256GcmTests {
     public static void TestVectors_Decrypt_Array_Tampered(TestVector testVector) {
         Xaes256GcmCipher xaes = new(testVector.Key.AsSpan());
 
-        byte[] tamperedCiphertext =testVector.Ciphertext.AsSpan().ToArray();
+        byte[] tamperedCiphertext = testVector.Ciphertext.AsSpan().ToArray();
         FlipRandomBit(tamperedCiphertext);
         Assert.Throws<AuthenticationTagMismatchException>(() =>
             xaes.Decrypt(tamperedCiphertext, testVector.Nonce, testVector.Aad));
@@ -158,9 +158,9 @@ public static class Xaes256GcmTests {
         Xaes256GcmCipher xaes = new(ZeroKey);
         byte[] first = new byte[Xaes256GcmCipher.Overhead];
         byte[] second = new byte[Xaes256GcmCipher.Overhead];
-        int firstWritten = xaes.Seal([], first.AsSpan());
-        int secondWritten = xaes.Seal([], second.AsSpan());
-        Assert.NotEqual(first.AsSpan(0, firstWritten).ToArray(), second.AsSpan(0, secondWritten).ToArray());
+        _ = xaes.Seal([], first.AsSpan());
+        _ = xaes.Seal([], second.AsSpan());
+        Assert.NotEqual(first.AsSpan(0, Xaes256GcmCipher.NonceSize).ToArray(), second.AsSpan(0, Xaes256GcmCipher.NonceSize).ToArray());
     }
 
     [Fact]
