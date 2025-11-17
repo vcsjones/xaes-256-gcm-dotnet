@@ -1,6 +1,5 @@
-#if NET9_0_OR_GREATER
 using System.Security.Cryptography;
-#endif
+using TestVector = (byte[] Key, byte[] Nonce, byte[] Plaintext, byte[] Ciphertext, byte[] Aad);
 
 namespace Xaes256Gcm.Tests;
 
@@ -12,7 +11,7 @@ public static class Xaes256GcmTests {
 
     [Theory]
     [MemberData(nameof(TestVectors))]
-    public static void TestVectors_Span((byte[] Key, byte[] Nonce, byte[] Plaintext, byte[] Ciphertext, byte[] Aad) testVector) {
+    public static void TestVectors_EncryptDecrypt_Span(TestVector testVector) {
         Xaes256GcmCipher xaes = new(testVector.Key.AsSpan());
         Span<byte> ciphertext = new byte[testVector.Plaintext.Length + Xaes256GcmCipher.OverheadEncryption + 256];
         int written = xaes.Encrypt(testVector.Plaintext.AsSpan(), testVector.Nonce.AsSpan(), ciphertext, testVector.Aad.AsSpan());
@@ -27,13 +26,62 @@ public static class Xaes256GcmTests {
 
     [Theory]
     [MemberData(nameof(TestVectors))]
-    public static void TestVectors_Array((byte[] Key, byte[] Nonce, byte[] Plaintext, byte[] Ciphertext, byte[] Aad) testVector) {
+    public static void TestVectors_EncryptDecrypt_Array(TestVector testVector) {
         Xaes256GcmCipher xaes = new(testVector.Key);
         byte[] ciphertext = xaes.Encrypt(testVector.Plaintext, testVector.Nonce, testVector.Aad);
         Assert.Equal(testVector.Ciphertext, ciphertext);
 
         byte[] decrypted = xaes.Decrypt(ciphertext, testVector.Nonce, testVector.Aad);
         Assert.Equal(testVector.Plaintext, decrypted);
+    }
+
+    [Theory]
+    [MemberData(nameof(TestVectors))]
+    public static void TestVectors_Open_Array(TestVector testVector) {
+        Xaes256GcmCipher xaes = new(testVector.Key);
+        byte[] opened = xaes.Open([..testVector.Nonce, ..testVector.Ciphertext], testVector.Aad);
+        Assert.Equal(testVector.Plaintext, opened);
+    }
+
+    [Theory]
+    [MemberData(nameof(TestVectors))]
+    public static void TestVectors_Open_Span(TestVector testVector) {
+        Xaes256GcmCipher xaes = new(testVector.Key);
+        byte[] destination = new byte[testVector.Plaintext.Length];
+
+        // Exact
+        int written = xaes.Open([..testVector.Nonce, ..testVector.Ciphertext], destination, testVector.Aad);
+        Assert.Equal(testVector.Plaintext, destination);
+        Assert.Equal(testVector.Plaintext.Length, written);
+
+        // Oversized
+        destination = new byte[testVector.Plaintext.Length + 256];
+        written = xaes.Open([..testVector.Nonce, ..testVector.Ciphertext], destination, testVector.Aad);
+        Assert.Equal(testVector.Plaintext, destination.AsSpan(0, written));
+        Assert.Equal(testVector.Plaintext.Length, written);
+    }
+
+    [Theory]
+    [MemberData(nameof(TestVectors))]
+    public static void TestVectors_Decrypt_Span_Tampered(TestVector testVector) {
+        Xaes256GcmCipher xaes = new(testVector.Key.AsSpan());
+
+        byte[] tamperedCiphertext =testVector.Ciphertext.AsSpan().ToArray();
+        FlipRandomBit(tamperedCiphertext);
+        byte[] buffer = new byte[testVector.Plaintext.Length];
+        Assert.Throws<AuthenticationTagMismatchException>(() =>
+            xaes.Decrypt(tamperedCiphertext, testVector.Nonce, buffer.AsSpan(), testVector.Aad));
+    }
+
+    [Theory]
+    [MemberData(nameof(TestVectors))]
+    public static void TestVectors_Decrypt_Array_Tampered(TestVector testVector) {
+        Xaes256GcmCipher xaes = new(testVector.Key.AsSpan());
+
+        byte[] tamperedCiphertext =testVector.Ciphertext.AsSpan().ToArray();
+        FlipRandomBit(tamperedCiphertext);
+        Assert.Throws<AuthenticationTagMismatchException>(() =>
+            xaes.Decrypt(tamperedCiphertext, testVector.Nonce, testVector.Aad));
     }
 
     [Fact]
@@ -92,15 +140,70 @@ public static class Xaes256GcmTests {
     }
 
     [Fact]
+    public static void Seal_ArgumentValidation_Null() {
+        Xaes256GcmCipher xaes = new(ZeroKey);
+        Assert.Throws<ArgumentNullException>(() => xaes.Seal(null));
+    }
+
+    [Fact]
+    public static void Seal_UniqueNonce_Array() {
+        Xaes256GcmCipher xaes = new(ZeroKey);
+        byte[] first = xaes.Seal([]);
+        byte[] second = xaes.Seal([]);
+        Assert.NotEqual(first.AsSpan(0, Xaes256GcmCipher.NonceSize).ToArray(), second.AsSpan(0, Xaes256GcmCipher.NonceSize).ToArray());
+    }
+
+    [Fact]
+    public static void Seal_UniqueNonce_Span() {
+        Xaes256GcmCipher xaes = new(ZeroKey);
+        byte[] first = new byte[Xaes256GcmCipher.Overhead];
+        byte[] second = new byte[Xaes256GcmCipher.Overhead];
+        int firstWritten = xaes.Seal([], first.AsSpan());
+        int secondWritten = xaes.Seal([], second.AsSpan());
+        Assert.NotEqual(first.AsSpan(0, firstWritten).ToArray(), second.AsSpan(0, secondWritten).ToArray());
+    }
+
+    [Fact]
+    public static void SealOpenRoundtrip_Array() {
+        Xaes256GcmCipher xaes = new(ZeroKey);
+        byte[] plaintext = "sealed data"u8.ToArray();
+        byte[] aad = "additional data"u8.ToArray();
+        byte[] sealedData = xaes.Seal(plaintext, aad);
+        byte[] opened = xaes.Open(sealedData, aad);
+        Assert.Equal(plaintext, opened);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(256)]
+    public static void SealOpenRoundtrip_Span(int oversize) {
+        Xaes256GcmCipher xaes = new(ZeroKey);
+        byte[] plaintext = "sealed data"u8.ToArray();
+        byte[] aad = "additional data"u8.ToArray();
+
+        byte[] destination = new byte[plaintext.Length + Xaes256GcmCipher.Overhead + oversize];
+        int written = xaes.Seal(plaintext, destination, aad);
+        Assert.Equal(plaintext.Length + Xaes256GcmCipher.Overhead, written);
+
+        written = xaes.Open(destination.AsSpan(0, written), destination, aad);
+        Assert.Equal(plaintext.Length, written);
+        Assert.Equal(plaintext, destination.AsSpan(0, written));
+    }
+
+    [Fact]
     public static void UseAfterDispose() {
         Xaes256GcmCipher xaes = new(ZeroKey);
         xaes.Dispose();
         xaes.Dispose(); // No-op for secondary dispose.
-        byte[] destination = new byte[Xaes256GcmCipher.OverheadEncryption];
+        byte[] destination = new byte[Xaes256GcmCipher.Overhead];
         Assert.Throws<ObjectDisposedException>(() => xaes.Encrypt([], ZeroNonce));
         Assert.Throws<ObjectDisposedException>(() => xaes.Encrypt([], ZeroNonce, destination.AsSpan()));
         Assert.Throws<ObjectDisposedException>(() => xaes.Decrypt(ZeroCiphertext, ZeroNonce));
         Assert.Throws<ObjectDisposedException>(() => xaes.Decrypt(ZeroCiphertext, ZeroNonce, destination.AsSpan()));
+        Assert.Throws<ObjectDisposedException>(() => xaes.Seal([]));
+        Assert.Throws<ObjectDisposedException>(() => xaes.Seal([], destination.AsSpan()));
+        Assert.Throws<ObjectDisposedException>(() => xaes.Open([..ZeroNonce, ..ZeroCiphertext]));
+        Assert.Throws<ObjectDisposedException>(() => xaes.Open([..ZeroNonce, ..ZeroCiphertext], destination.AsSpan()));
     }
 
 #if NET9_0_OR_GREATER
@@ -144,5 +247,14 @@ public static class Xaes256GcmTests {
         byte[] key = new byte[Xaes256GcmCipher.KeySize];
         key.AsSpan().Fill(value);
         return key;
+    }
+
+    private static void FlipRandomBit(Span<byte> input) {
+#if NET
+        int index = Random.Shared.Next(0, input.Length);
+#else
+        int index = new Random().Next(0, input.Length);
+#endif
+        input[index] = (byte)(input[index] ^ 0b_10000000);
     }
 }

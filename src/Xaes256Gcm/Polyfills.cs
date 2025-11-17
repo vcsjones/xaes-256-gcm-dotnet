@@ -1,7 +1,6 @@
 #if !NET
 #pragma warning disable IDE0130
-namespace System
-{
+namespace System {
     using System.Runtime.CompilerServices;
 
     internal static class Polyfills {
@@ -19,7 +18,7 @@ namespace System
             }
         }
 
-        extension (ArgumentNullException) {
+        extension(ArgumentNullException) {
             public static void ThrowIfNull(object? argument, [CallerArgumentExpression(nameof(argument))] string? paramName = null) {
                 if (argument is null) {
                     throw new ArgumentNullException(paramName);
@@ -29,13 +28,10 @@ namespace System
     }
 }
 
-namespace System.Runtime.CompilerServices
-{
+namespace System.Runtime.CompilerServices {
     [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
-    internal sealed class CallerArgumentExpressionAttribute : Attribute
-    {
-        public CallerArgumentExpressionAttribute(string parameterName)
-        {
+    internal sealed class CallerArgumentExpressionAttribute : Attribute {
+        public CallerArgumentExpressionAttribute(string parameterName) {
             ParameterName = parameterName;
         }
 

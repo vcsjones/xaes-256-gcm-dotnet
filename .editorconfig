@@ -10,6 +10,9 @@ trim_trailing_whitespace = true
 # Formatting
 csharp_new_line_before_open_brace = none # k&r styling
 
+# IDE0305: Simplify collection initialization
+dotnet_style_prefer_collection_expression = never
+
 [*.csproj,*.slnx,*.props,*.yml]
 charset = utf-8
 insert_final_newline = true
