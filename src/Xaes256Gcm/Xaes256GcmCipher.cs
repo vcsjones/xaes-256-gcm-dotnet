@@ -7,10 +7,10 @@ namespace Xaes256Gcm;
 ///   Implements the XAES-256-GCM algorithm.
 /// </summary>
 /// <remarks>
-///   <para>The XAES-256-GCM algorithm is specified by https://github.com/C2SP/C2SP/blob/main/XAES-256-GCM.md.</para>
+///   <para>The XAES-256-GCM algorithm is specified by <see href="https://github.com/C2SP/C2SP/blob/main/XAES-256-GCM.md" />.</para>
 ///   <para>
 ///     Instances of this object are not thread safe. Callers must ensure instances are only ever accessed exclusively by
-///     a single thread. Using instances of this type from multiple threads may result in data corruption.
+///     a single thread.
 ///   </para>
 /// </remarks>
 public sealed class Xaes256GcmCipher : IDisposable {
@@ -189,7 +189,7 @@ public sealed class Xaes256GcmCipher : IDisposable {
     ///   <para><paramref name="nonce"/> is not exactly <see cref="NonceSize"/> bytes.</para>
     /// </exception>
     /// <exception cref="AuthenticationTagMismatchException">
-    ///   The authentication tag does validate the ciphertext and additional data.
+    ///   The authentication tag does not validate the ciphertext and additional data.
     /// </exception>
     /// <exception cref="ObjectDisposedException">
     ///   The current instance has been disposed.
@@ -197,7 +197,7 @@ public sealed class Xaes256GcmCipher : IDisposable {
     public byte[] Decrypt(byte[] ciphertext, byte[] nonce, byte[]? additionalData = null) {
         ArgumentNullException.ThrowIfNull(ciphertext);
         ArgumentNullException.ThrowIfNull(nonce);
-        ThrowIfCiphertextTooSmall(ciphertext);
+        ThrowIfCiphertextTooSmall(ciphertext, OverheadEncryption);
         ThrowIfNonceSizeIncorrect(nonce);
         ObjectDisposedException.ThrowIf(_transform is null, this);
 
@@ -222,13 +222,13 @@ public sealed class Xaes256GcmCipher : IDisposable {
     ///   <para><paramref name="destination"/> is too small to receive the plaintext.</para>
     /// </exception>
     /// <exception cref="AuthenticationTagMismatchException">
-    ///   The authentication tag does validate the ciphertext and additional data.
+    ///   The authentication tag does not validate the ciphertext and additional data.
     /// </exception>
     /// <exception cref="ObjectDisposedException">
     ///   The current instance has been disposed.
     /// </exception>
     public int Decrypt(ReadOnlySpan<byte> ciphertext, ReadOnlySpan<byte> nonce, Span<byte> destination, ReadOnlySpan<byte> additionalData = default) {
-        ThrowIfCiphertextTooSmall(ciphertext);
+        ThrowIfCiphertextTooSmall(ciphertext, OverheadEncryption);
         ThrowIfNonceSizeIncorrect(nonce);
 
         int plaintextLength = ciphertext.Length - OverheadEncryption;
@@ -237,6 +237,129 @@ public sealed class Xaes256GcmCipher : IDisposable {
 
         DecryptCore(ciphertext, nonce, destination[..plaintextLength], additionalData);
         return plaintextLength;
+    }
+
+    /// <summary>
+    ///   Seals, or encrypts, a plaintext, with optional additional data.
+    /// </summary>
+    /// <param name="plaintext">The plaintext to seal.</param>
+    /// <param name="additionalData">Additional data to authenticate as part of the encryption.</param>
+    /// <returns>A byte array representing the sealed and encrypted data.</returns>
+    /// <exception cref="ArgumentException">
+    ///   <para><paramref name="plaintext"/> is too long to encrypt.</para>
+    /// </exception>
+    /// <exception cref="ArgumentNullException">
+    ///   <paramref name="plaintext"/> is <see langword="null" />.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    ///   The current instance has been disposed.
+    /// </exception>
+    /// <remarks>
+    ///   Sealing performs the same encryption as <see cref="Encrypt(byte[], byte[], byte[])"/>, however the nonce is
+    ///   automatically generated from a secure random number generator and prepended to the ciphertext.
+    /// </remarks>
+    public byte[] Seal(byte[] plaintext, byte[]? additionalData = default) {
+        ArgumentNullException.ThrowIfNull(plaintext);
+        ThrowIfPlaintextTooLarge(plaintext);
+        ObjectDisposedException.ThrowIf(_transform is null, this);
+
+        byte[] destination = new byte[plaintext.Length + Overhead];
+        ReadOnlySpan<byte> nonce = Helpers.FillCsprng(destination, 0, NonceSize);
+        Span<byte> ciphertext = destination.AsSpan(NonceSize);
+        EncryptCore(plaintext, nonce, ciphertext, additionalData);
+        return destination;
+    }
+
+    /// <summary>
+    ///   Seals, or encrypts, a plaintext, with optional additional data.
+    /// </summary>
+    /// <param name="plaintext">The plaintext to seal.</param>
+    /// <param name="destination">The buffer to receive the sealed data.</param>
+    /// <param name="additionalData">Additional data to authenticate as part of the encryption.</param>
+    /// <returns>The number of bytes written to <paramref name="destination"/>.</returns>
+    /// <exception cref="ArgumentException">
+    ///   <para><paramref name="plaintext"/> is too long to encrypt.</para>
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    ///   The current instance has been disposed.
+    /// </exception>
+    /// <remarks>
+    ///   Sealing performs the same encryption as
+    ///   <see cref="Encrypt(ReadOnlySpan{byte}, ReadOnlySpan{byte}, Span{byte}, ReadOnlySpan{byte})"/>, however the
+    ///   nonce is automatically generated from a secure random number generator and prepended to the ciphertext.
+    /// </remarks>
+    public int Seal(ReadOnlySpan<byte> plaintext, Span<byte> destination, ReadOnlySpan<byte> additionalData = default) {
+        ThrowIfPlaintextTooLarge(plaintext);
+        ThrowIfDestinationTooSmall(destination, plaintext.Length + Overhead);
+        ObjectDisposedException.ThrowIf(_transform is null, this);
+        Span<byte> nonce = destination[..NonceSize];
+        Span<byte> ciphertext = destination.Slice(NonceSize, plaintext.Length + OverheadEncryption);
+
+        Helpers.FillCsprng(nonce);
+        EncryptCore(plaintext, nonce, ciphertext, additionalData);
+        return plaintext.Length + Overhead;
+    }
+
+    /// <summary>
+    ///   Opens, or decrypts, a ciphertext, with optional additional data.
+    /// </summary>
+    /// <param name="ciphertext">The ciphertext to open.</param>
+    /// <param name="additionalData">The additional data to authenticate that was used as part of sealing.</param>
+    /// <returns>The decrypted plaintext data.</returns>
+    /// <exception cref="ArgumentNullException">
+    ///   <paramref name="ciphertext"/> is <see langword="null"/>.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    ///   <paramref name="ciphertext"/> is too small to contain authenticated data.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    ///   The current instance has been disposed.
+    /// </exception>
+    /// <exception cref="AuthenticationTagMismatchException">
+    ///   The authentication tag does not validate the ciphertext and additional data.
+    /// </exception>
+    public byte[] Open(byte[] ciphertext, byte[]? additionalData = default) {
+        ArgumentNullException.ThrowIfNull(ciphertext);
+        ThrowIfCiphertextTooSmall(ciphertext, Overhead);
+        ObjectDisposedException.ThrowIf(_transform is null, this);
+
+        ReadOnlySpan<byte> nonce = ciphertext.AsSpan(0, NonceSize);
+        ReadOnlySpan<byte> plainCiphertext = ciphertext.AsSpan(NonceSize);
+
+        byte[] destination = new byte[ciphertext.Length - Overhead];
+        DecryptCore(plainCiphertext, nonce, destination, additionalData);
+        return destination;
+    }
+
+    /// <summary>
+    ///   Opens, or decrypts, a ciphertext, with optional additional data.
+    /// </summary>
+    /// <param name="ciphertext">The ciphertext to open.</param>
+    /// <param name="destination">The buffer to receive the plaintext.</param>
+    /// <param name="additionalData">The additional data to authenticate that was used as part of sealing.</param>
+    /// <returns>The number of bytes written to <paramref name="destination"/>.</returns>
+    /// <exception cref="ArgumentException">
+    ///   <para><paramref name="ciphertext"/> is too small to contain authenticated data.</para>
+    ///   <para> -or- </para>
+    ///   <para><paramref name="destination"/> is too small to receive the plaintext data.</para>
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    ///   The current instance has been disposed.
+    /// </exception>
+    /// <exception cref="AuthenticationTagMismatchException">
+    ///   The authentication tag does not validate the ciphertext and additional data.
+    /// </exception>
+    public int Open(ReadOnlySpan<byte> ciphertext, Span<byte> destination, ReadOnlySpan<byte> additionalData = default) {
+        ThrowIfCiphertextTooSmall(ciphertext, Overhead);
+
+        int plaintextSize = ciphertext.Length - Overhead;
+        ThrowIfDestinationTooSmall(destination, plaintextSize);
+        ObjectDisposedException.ThrowIf(_transform is null, this);
+
+        ReadOnlySpan<byte> nonce = ciphertext[..NonceSize];
+        ReadOnlySpan<byte> plainCiphertext = ciphertext[NonceSize..];
+        DecryptCore(plainCiphertext, nonce, destination[..plaintextSize], additionalData);
+        return plaintextSize;
     }
 
     private void EncryptCore(ReadOnlySpan<byte> plaintext, ReadOnlySpan<byte> nonce, Span<byte> destination, ReadOnlySpan<byte> additionalData) {
@@ -285,8 +408,8 @@ public sealed class Xaes256GcmCipher : IDisposable {
         }
     }
 
-    private static void ThrowIfCiphertextTooSmall(ReadOnlySpan<byte> ciphertext) {
-        if (ciphertext.Length < TagSize) {
+    private static void ThrowIfCiphertextTooSmall(ReadOnlySpan<byte> ciphertext, int size) {
+        if (ciphertext.Length < size) {
             throw new ArgumentException(ExceptionText.CiphertextTooSmall, nameof(ciphertext));
         }
     }
