@@ -8,8 +8,16 @@
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <IsAotCompatible>true</IsAotCompatible>
-    <Authors>Kevin Jones</Authors>
     <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Kevin Jones</Authors>
+    <Copyright>Kevin Jones</Copyright>
+    <Description>An XAES-256-GCM implementation.</Description>
+    <PackageId>Xaes256Gcm</PackageId>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/vcsjones/xaes-256-gcm-dotnet</PackageProjectUrl>
   </PropertyGroup>
 
   <PropertyGroup Condition="$(TargetFramework.StartsWith('net4'))">
