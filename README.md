@@ -15,7 +15,7 @@ Resources:
 byte[] key; // Assign to some key
 byte[] plaintext = "Hello XAES-256-GCM from .NET"u8.ToArray();
 
-using Xaes256Gcm xaes = new(key);
+using Xaes256GcmCipher xaes = new(key);
 
 // Seal, or encrypt
 // AAD ca be passed as an optional argument

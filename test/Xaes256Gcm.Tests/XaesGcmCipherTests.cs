@@ -4,10 +4,10 @@ using TestVector = (byte[] Key, byte[] Nonce, byte[] Plaintext, byte[] Ciphertex
 namespace Xaes256Gcm.Tests;
 
 public static class Xaes256GcmTests {
-    public static byte[] ZeroKey => field ??= new byte[Xaes256GcmCipher.KeySize];
-    public static byte[] ZeroNonce => field ??= new byte[Xaes256GcmCipher.NonceSize];
-    public static byte[] ZeroCiphertext => field ??= [0xFE, 0x62, 0x02, 0x4A, 0x33, 0x49, 0xC0, 0x6A, 0x33, 0xAF, 0xDA, 0x22, 0xA1, 0x33, 0x98, 0x1B];
-    public static byte[] OneCiphertext => field ??= [0x2D, 0x01, 0x37, 0xD1, 0x9A, 0xB3, 0xEE, 0x4C, 0x46, 0xCA, 0x4D, 0xEC, 0x7D, 0x31, 0x39, 0x50, 0xC2];
+    private static byte[] ZeroKey => field ??= new byte[Xaes256GcmCipher.KeySize];
+    private static byte[] ZeroNonce => field ??= new byte[Xaes256GcmCipher.NonceSize];
+    private static byte[] ZeroCiphertext => field ??= [0xFE, 0x62, 0x02, 0x4A, 0x33, 0x49, 0xC0, 0x6A, 0x33, 0xAF, 0xDA, 0x22, 0xA1, 0x33, 0x98, 0x1B];
+    private static byte[] OneCiphertext => field ??= [0x2D, 0x01, 0x37, 0xD1, 0x9A, 0xB3, 0xEE, 0x4C, 0x46, 0xCA, 0x4D, 0xEC, 0x7D, 0x31, 0x39, 0x50, 0xC2];
 
     [Theory]
     [MemberData(nameof(TestVectors))]
@@ -211,7 +211,9 @@ public static class Xaes256GcmTests {
     [InlineData(10_000, "e6b9edf2df6cec60c8cbd864e2211b597fb69a529160cd040d56c0c210081939")]
     [InlineData(1_000_000, "2163ae1445985a30b60585ee67daa55674df06901b890593e824b8a7c885ab15")]
     public static void TestAccumulated(int iterations, string expected) {
-        if (!Shake128.IsSupported || (OperatingSystem.IsLinux() && SafeEvpPKeyHandle.OpenSslVersion < 0x30300000L)) {
+        const long OpenSSL_3_3 = 0x30300000L;
+
+        if (!Shake128.IsSupported || (OperatingSystem.IsLinux() && SafeEvpPKeyHandle.OpenSslVersion < OpenSSL_3_3)) {
             Assert.Skip("Platform does not support SHAKE128.");
         }
 
@@ -238,7 +240,7 @@ public static class Xaes256GcmTests {
     }
 #endif
 
-    public static TheoryData<(byte[] Key, byte[] Nonce, byte[] Plaintext, byte[] Ciphertext, byte[] Aad)> TestVectors =>  [
+    public static TheoryData<TestVector> TestVectors =>  [
         (KeyOf(0x01), "ABCDEFGHIJKLMNOPQRSTUVWX"u8.ToArray(), "XAES-256-GCM"u8.ToArray(), Convert.FromHexString("ce546ef63c9cc60765923609b33a9a1974e96e52daf2fcf7075e2271"), null),
         (KeyOf(0x03), "ABCDEFGHIJKLMNOPQRSTUVWX"u8.ToArray(), "XAES-256-GCM"u8.ToArray(), Convert.FromHexString("986ec1832593df5443a179437fd083bf3fdb41abd740a21f71eb769d"), "c2sp.org/XAES-256-GCM"u8.ToArray())
     ];
