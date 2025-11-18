@@ -81,7 +81,7 @@ public sealed class Xaes256GcmCipher : IDisposable {
             throw new ArgumentException(ExceptionText.InvalidKeyLength, nameof(key));
         }
 
-        Aes aes = Aes.Create();
+        using Aes aes = Aes.Create();
         aes.Mode = CipherMode.ECB;
         _transform = aes.CreateEncryptor(key, null);
         _k1 = InitializeK1(_transform);
