@@ -58,7 +58,7 @@ public sealed class Xaes256GcmCipher : IDisposable {
             throw new ArgumentException(ExceptionText.InvalidKeyLength, nameof(key));
         }
 
-        Aes aes = Aes.Create();
+        using Aes aes = Aes.Create();
         aes.Mode = CipherMode.ECB;
 
 #if NET10_0_OR_GREATER
@@ -81,15 +81,15 @@ public sealed class Xaes256GcmCipher : IDisposable {
             throw new ArgumentException(ExceptionText.InvalidKeyLength, nameof(key));
         }
 
-        Aes aes = Aes.Create();
+        using Aes aes = Aes.Create();
         aes.Mode = CipherMode.ECB;
         _transform = aes.CreateEncryptor(key, null);
         _k1 = InitializeK1(_transform);
     }
 
-    private static byte[] InitializeK1(ICryptoTransform aes) {
+    private static byte[] InitializeK1(ICryptoTransform transform) {
         byte[] k1 = new byte[BlockSize];
-        int written = aes.TransformBlock(k1, 0, BlockSize, k1, 0);
+        int written = transform.TransformBlock(k1, 0, BlockSize, k1, 0);
 
         // We should always get a whole block back. Otherwise it indicates a bug in the runtime.
         if (written != BlockSize) {
