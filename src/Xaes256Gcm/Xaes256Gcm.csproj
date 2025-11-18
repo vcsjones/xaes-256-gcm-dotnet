@@ -20,12 +20,20 @@
     <PackageId>Xaes256Gcm</PackageId>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/vcsjones/xaes-256-gcm-dotnet</PackageProjectUrl>
+    <MinVerTagPrefix>v</MinVerTagPrefix>
   </PropertyGroup>
 
   <PropertyGroup Condition="$(TargetFramework.StartsWith('net4'))">
     <Nullable>annotations</Nullable>
     <IsAotCompatible>false</IsAotCompatible>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MinVer">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
 
   <ItemGroup Condition="$(TargetFramework.StartsWith('net4'))">
     <PackageReference Include="Microsoft.Bcl.Cryptography" />
