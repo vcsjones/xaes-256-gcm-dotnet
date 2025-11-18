@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    if: github.repository == 'vcsjones/xaes-256-gcm-dotnet'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0
+
+      - name: Package
+        run: |
+          mkdir -p pkg
+          dotnet pack -p:ContinuousIntegrationBuild=true -c Release -o pkg
+
+          for f in pkg/*.nupkg; do
+            mv -- "$f" "${f%.nupkg}_unsigned.nupkg"
+          done
+
+      - name: Artifact attestation
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'pkg/*.nupkg'
+
+      - name: Create GitHub Release
+        run: |
+          tag_name="$(git describe --tags --abbrev=0)"
+          gh release create "${tag_name}" --verify-tag --draft --generate-notes pkg/*.nupkg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
