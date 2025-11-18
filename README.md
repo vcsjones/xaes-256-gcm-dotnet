@@ -11,6 +11,8 @@ Resources:
 
 # Using
 
+Get from NuGet: https://www.nuget.org/packages/Xaes256Gcm/
+
 ```C#
 byte[] key; // Assign to some key
 byte[] plaintext = "Hello XAES-256-GCM from .NET"u8.ToArray();
