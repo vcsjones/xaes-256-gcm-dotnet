@@ -47,4 +47,4 @@ Compress-Archive -Path "$scratchDir\*" -DestinationPath $outputPath
 
 dotnet nuget sign --certificate-fingerprint 68821304869e065c24e0684eb43bf974e124642f3437f2ff494a93bb371d029a --hash-algorithm SHA384 --timestamper "http://timestamp.digicert.com" --overwrite "$outputPath"
 
-popd
+Remove-Item -Path $scratchDir -Recurse -Force -ErrorAction SilentlyContinue
